@@ -7,7 +7,6 @@ import 'dart:math' as math;
 import 'dart:io';
 import 'dart:math';
 import 'package:camera/camera.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -2277,6 +2276,24 @@ class _HomePageState extends State<HomePage> {
           const AppBottomNav(currentIndex: 0),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ChatBotPage()),
+          );
+        },
+        backgroundColor: AppColors.blue,
+        child: Image.asset(
+          'assets/images/Chat Bot (2).png',
+          width: 30,
+          height: 30,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.smart_toy,
+            color: Colors.white,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           controller: scrollController,
@@ -2303,6 +2320,24 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const Spacer(),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ChatBotPage()),
+                      );
+                    },
+                    icon: Image.asset(
+                      'assets/images/Chat Bot (2).png',
+                      width: 28,
+                      height: 28,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.smart_toy,
+                        color: AppColors.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     onPressed: logout,
                     icon: const Icon(
@@ -2448,8 +2483,6 @@ class _ScanPageState extends State<ScanPage> {
   }
 
   CameraController? controller;
-  List<CameraDescription> cameras = [];
-  int currentCameraIndex = 0;
 
   String result = "Belum ada analisis";
   Map<String, dynamic>? lastScanResult;
@@ -2515,7 +2548,7 @@ class _ScanPageState extends State<ScanPage> {
     }
 
     try {
-      cameras = await availableCameras();
+      final cameras = await availableCameras();
 
       if (cameras.isEmpty) {
         if (!mounted) return;
@@ -2526,18 +2559,8 @@ class _ScanPageState extends State<ScanPage> {
         return;
       }
 
-      // Set default ke kamera belakang jika ada
-      currentCameraIndex = cameras.indexWhere((camera) => 
-        camera.lensDirection == CameraLensDirection.back
-      );
-      
-      // Jika tidak ada kamera belakang, gunakan kamera pertama
-      if (currentCameraIndex == -1) {
-        currentCameraIndex = 0;
-      }
-
       controller = CameraController(
-        cameras[currentCameraIndex],
+        cameras.first,
         ResolutionPreset.medium,
       );
 
@@ -2555,39 +2578,6 @@ class _ScanPageState extends State<ScanPage> {
         result = "Gagal membuka kamera";
         loading = false;
       });
-    }
-  }
-
-  Future<void> switchCamera() async {
-    if (cameras.length <= 1) return; // Tidak ada kamera lain untuk switch
-
-    try {
-      // Dispose kamera saat ini
-      await controller?.dispose();
-      
-      // Toggle ke kamera berikutnya
-      currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
-      
-      // Initialize kamera baru
-      controller = CameraController(
-        cameras[currentCameraIndex],
-        ResolutionPreset.medium,
-      );
-
-      await controller!.initialize();
-
-      if (mounted) {
-        setState(() {
-          // Trigger rebuild untuk update camera preview
-        });
-      }
-    } catch (e) {
-      debugPrint("Switch camera error: $e");
-      if (!mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Gagal mengganti kamera")),
-      );
     }
   }
 
@@ -2754,192 +2744,6 @@ class _ScanPageState extends State<ScanPage> {
     }
   }
 
-  Future<void> analyzeFromGallery() async {
-    try {
-      setState(() {
-        analyzing = true;
-        result = "Memilih foto dari galeri...";
-      });
-
-      // Pause kamera sementara saat membuka galeri
-      if (controller != null && controller!.value.isInitialized) {
-        try {
-          await controller!.pausePreview();
-        } catch (_) {}
-      }
-
-      // Pilih foto dari galeri
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-      );
-
-      // Resume kamera setelah galeri ditutup
-      if (controller != null && controller!.value.isInitialized) {
-        try {
-          await controller!.resumePreview();
-        } catch (_) {}
-      }
-
-      if (image == null) {
-        setState(() {
-          result = "Tidak ada foto yang dipilih";
-          analyzing = false;
-        });
-        return;
-      }
-
-      setState(() {
-        result = "Menganalisis foto dari galeri...";
-      });
-
-      final imageFile = File(image.path);
-      final imageUrl = await uploadScanImage(imageFile);
-
-      final inputImage = InputImage.fromFile(imageFile);
-      final poses = await poseDetector.processImage(inputImage);
-
-      if (!mounted) return;
-
-      if (poses.isEmpty) {
-        setState(() {
-          result = "Tubuh tidak terdeteksi pada foto.\nPastikan foto menampilkan seluruh tubuh dengan jelas.";
-          analyzing = false;
-        });
-        return;
-      }
-
-      final pose = poses.first;
-      final qualityScore = pose.landmarks.length;
-
-      final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
-      final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
-      final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
-      final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
-      final nose = pose.landmarks[PoseLandmarkType.nose];
-      final leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
-      final rightKnee = pose.landmarks[PoseLandmarkType.rightKnee];
-
-      if (leftShoulder == null ||
-          rightShoulder == null ||
-          leftHip == null ||
-          rightHip == null ||
-          nose == null ||
-          leftKnee == null ||
-          rightKnee == null) {
-        setState(() {
-          result = "Posisi tubuh tidak lengkap pada foto.\nPilih foto yang menampilkan seluruh tubuh.";
-          analyzing = false;
-        });
-        return;
-      }
-
-      // Analisis yang sama dengan kamera
-      final shoulderAngle = calculateAngle(
-        leftShoulder.x,
-        leftShoulder.y,
-        rightShoulder.x,
-        rightShoulder.y,
-      );
-
-      final hipAngle = calculateAngle(
-        leftHip.x,
-        leftHip.y,
-        rightHip.x,
-        rightHip.y,
-      );
-
-      final shoulderDiff = shoulderAngle.abs();
-      final hipDiff = hipAngle.abs();
-
-      final bodyCenterX = (leftHip.x + rightHip.x) / 2;
-      final headOffset = (nose.x - bodyCenterX).abs();
-
-      String pemeriksaan;
-      if (shoulderDiff < 5 && hipDiff < 5 && headOffset < 30) {
-        pemeriksaan = "Postur Relatif Normal";
-      } else if (shoulderDiff < 10 && hipDiff < 10) {
-        pemeriksaan = "Indikasi Asimetri Ringan";
-      } else if (shoulderDiff < 20 && hipDiff < 20) {
-        pemeriksaan = "Indikasi Asimetri Sedang";
-      } else {
-        pemeriksaan = "Indikasi Kemiringan Signifikan";
-      }
-
-      double score = 100 - ((shoulderDiff * 2) + hipDiff + (headOffset / 5));
-      score = score.clamp(0, 100);
-
-      String recommendation;
-      if (score >= 85) {
-        recommendation = "Postur tubuh baik. Pertahankan kebiasaan yang sehat.";
-      } else if (score >= 70) {
-        recommendation =
-            "Terdapat sedikit ketidakseimbangan. Perhatikan posisi duduk, berdiri, dan lakukan peregangan secara rutin.";
-      } else if (score >= 60) {
-        recommendation =
-            "Terlihat adanya asimetri postur tingkat sedang. Disarankan melakukan latihan koreksi postur dan evaluasi berkala.";
-      } else {
-        recommendation =
-            "Terdeteksi ketidakseimbangan postural yang cukup signifikan. Pertimbangkan konsultasi dengan tenaga kesehatan atau fisioterapis.";
-      }
-
-      await saveScanResult(
-        pemeriksaan,
-        score,
-        shoulderDiff,
-        hipDiff,
-        headOffset,
-        qualityScore,
-        recommendation,
-        imageUrl,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        lastScanResult = {
-          'pemeriksaan': pemeriksaan,
-          'score': score,
-          'shoulderDiff': shoulderDiff,
-          'hipDiff': hipDiff,
-          'headOffset': headOffset,
-          'qualityScore': qualityScore,
-          'recommendation': recommendation,
-          'imageUrl': imageUrl,
-          'createdAt': Timestamp.now(),
-        };
-
-        result = "HASIL ANALISIS POSTUR\n\n"
-            "Status : $pemeriksaan\n\n"
-            "Skor Postur : ${score.toStringAsFixed(0)}/100\n\n"
-            "Kemiringan Bahu : ${shoulderDiff.toStringAsFixed(1)}°\n"
-            "Kemiringan Pinggul : ${hipDiff.toStringAsFixed(1)}°\n"
-            "Deviasi Kepala : ${headOffset.toStringAsFixed(1)} px\n\n"
-            "Rekomendasi:\n$recommendation";
-
-        analyzing = false;
-      });
-
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        builder: (_) => ScanResultModal(
-          data: lastScanResult!,
-          onScanAgain: () {},
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        result = "Error menganalisis foto: $e";
-        analyzing = false;
-      });
-    }
-  }
-
   Future<void> saveScanResult(
     String pemeriksaan,
     double score,
@@ -3014,96 +2818,30 @@ class _ScanPageState extends State<ScanPage> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: controller == null
-                            ? const SizedBox(
-                                height: 220,
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            : AspectRatio(
-                                aspectRatio: controller!.value.aspectRatio,
-                                child: CameraPreview(
-                                  controller!,
-                                ),
-                              ),
-                      ),
-                      // Switch camera button
-                      if (cameras.length > 1 && !loading)
-                        Positioned(
-                          top: 16,
-                          right: 16,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(30),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: controller == null
+                        ? const SizedBox(
+                            height: 220,
+                            child: Center(
+                              child: CircularProgressIndicator(),
                             ),
-                            child: IconButton(
-                              onPressed: analyzing ? null : switchCamera,
-                              icon: const Icon(
-                                Icons.flip_camera_ios,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                              tooltip: 'Ganti Kamera',
+                          )
+                        : AspectRatio(
+                            aspectRatio: controller!.value.aspectRatio,
+                            child: CameraPreview(
+                              controller!,
                             ),
                           ),
-                        ),
-                    ],
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: analyzing ? null : () {
-                            analyzePose();
-                          },
-                          icon: const Icon(Icons.camera_alt, color: Colors.white),
-                          label: const Text(
-                            'Ambil Foto',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.blue,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: analyzing ? null : () {
-                            analyzeFromGallery();
-                          },
-                          icon: const Icon(Icons.photo_library, color: Colors.white),
-                          label: const Text(
-                            'Dari Galeri',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xff28a745),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  MainButton(
+                    text: analyzing ? "Menganalisis..." : "Analisis Postur",
+                    onTap: () {
+                      if (!analyzing) {
+                        analyzePose();
+                      }
+                    },
                   ),
                   const SizedBox(height: 20),
                   Card(
@@ -4157,7 +3895,6 @@ class _UserDataPageState extends State<UserDataPage> {
   final umur = TextEditingController();
   final tinggi = TextEditingController();
   final berat = TextEditingController();
-  final riwayat = TextEditingController();
   bool isScanning = false;
 
   String status = "";
@@ -4275,7 +4012,6 @@ class _UserDataPageState extends State<UserDataPage> {
     umur.dispose();
     tinggi.dispose();
     berat.dispose();
-    riwayat.dispose();
     scrollController.dispose();
     super.dispose();
   }
@@ -4405,7 +4141,7 @@ class _UserDataPageState extends State<UserDataPage> {
         gender: selectedGender,
         height: tinggi.text.trim().isEmpty ? '-' : tinggi.text.trim(),
         weight: berat.text.trim().isEmpty ? '-' : berat.text.trim(),
-        postureNote: riwayat.text.trim().isEmpty ? '-' : riwayat.text.trim(),
+        postureNote: '-',
         referencePhoto: referencePhoto,
       );
 
@@ -4458,7 +4194,7 @@ class _UserDataPageState extends State<UserDataPage> {
           'age': umur.text.trim(),
           'height': tinggi.text.trim(),
           'weight': berat.text.trim(),
-          'note': riwayat.text.trim(),
+          'note': '-',
         },
       });
 
@@ -4987,6 +4723,24 @@ class _UserDataPageState extends State<UserDataPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
         bottomNavigationBar: const AppBottomNav(currentIndex: 1),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ChatBotPage()),
+            );
+          },
+          backgroundColor: AppColors.blue,
+          child: Image.asset(
+            'assets/images/Chat Bot (2).png',
+            width: 30,
+            height: 30,
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.smart_toy,
+              color: Colors.white,
+            ),
+          ),
+        ),
         body: SafeArea(
           child: SingleChildScrollView(
             controller: scrollController,
@@ -5118,11 +4872,6 @@ class _UserDataPageState extends State<UserDataPage> {
                                 'Masukkan berat badan (kg)',
                                 berat,
                                 type: TextInputType.number,
-                              ),
-                              field(
-                                'Catatan Postur',
-                                'Contoh: Tidak ada / Ada riwayat keluarga',
-                                riwayat,
                               ),
                               const SizedBox(height: 10),
                               MainButton(
@@ -5946,6 +5695,24 @@ class _HistoryPageState extends State<HistoryPage> {
           const AppBottomNav(currentIndex: 2),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ChatBotPage()),
+          );
+        },
+        backgroundColor: AppColors.blue,
+        child: Image.asset(
+          'assets/images/Chat Bot (2).png',
+          width: 30,
+          height: 30,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.smart_toy,
+            color: Colors.white,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -6500,39 +6267,57 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final value = snapshot.data ?? 0;
 
         return Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, color: AppColors.blue, size: 32),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.black54,
-                  fontWeight: FontWeight.bold,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Icon(icon, color: AppColors.blue, size: 26),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      note,
+                      style: const TextStyle(
+                        color: AppColors.blue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 '$value',
                 style: const TextStyle(
-                  fontSize: 30,
+                  fontSize: 22,
                   color: Colors.black,
                   fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                note,
-                style: const TextStyle(
-                  color: AppColors.blue,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
                 ),
               ),
             ],
@@ -6620,9 +6405,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          childAspectRatio: 1.05,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.8,
           children: [
             statCard(
               'Total Pengguna',
@@ -6663,20 +6448,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget latestScanCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Review Terbaru',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const Text('Hasil scan yang masuk dari user'),
+          const Text(
+            'Hasil scan yang masuk dari user',
+            style: TextStyle(color: Colors.black54, fontSize: 13),
+          ),
           const SizedBox(height: 14),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
@@ -6703,29 +6491,75 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   final result = data['result'] as Map<String, dynamic>? ?? {};
                   final status = data['status']?.toString() ?? '-';
 
+                  final rawTilt = result['tilt'];
+                  final String tiltStr;
+                  if (rawTilt is num) {
+                    tiltStr = rawTilt.toStringAsFixed(1);
+                  } else {
+                    tiltStr = double.tryParse(rawTilt?.toString() ?? '')?.toStringAsFixed(1) ?? '0.0';
+                  }
+
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.lightBlue,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.camera_alt, color: AppColors.blue),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            '${profile['name'] ?? 'Tanpa nama'}\nTilt: ${result['tilt'] ?? 0}°',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                        Row(
+                          children: [
+                            const Icon(Icons.camera_alt, color: AppColors.blue, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                profile['name'] ?? 'Tanpa nama',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          status,
-                          style: TextStyle(
-                            color: statusColor(status),
-                            fontWeight: FontWeight.bold,
-                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'Tilt: $tiltStr°',
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const Spacer(),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor(status).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  status,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: statusColor(status),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -6810,7 +6644,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           children: [
             const Text(
               'Hasil Scan',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 14),
             ...docs.map((doc) {
@@ -6819,32 +6653,99 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               final result = data['result'] as Map<String, dynamic>? ?? {};
               final status = data['status']?.toString() ?? '-';
 
+              final rawTilt = result['tilt'];
+              final String tiltStr;
+              if (rawTilt is num) {
+                tiltStr = rawTilt.toStringAsFixed(1);
+              } else {
+                tiltStr = double.tryParse(rawTilt?.toString() ?? '')?.toStringAsFixed(1) ?? '0.0';
+              }
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   boxShadow: const [
                     BoxShadow(color: Colors.black12, blurRadius: 6),
                   ],
                 ),
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: AppColors.lightBlue,
-                    child: Icon(Icons.camera_alt, color: AppColors.blue),
-                  ),
-                  title: Text(profile['name'] ?? 'Tanpa nama'),
-                  subtitle: Text(
-                    'Tilt: ${result['tilt'] ?? 0}° • ${data['recommendation'] ?? '-'}',
-                  ),
-                  trailing: Text(
-                    status,
-                    style: TextStyle(
-                      color: statusColor(status),
-                      fontWeight: FontWeight.bold,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 18,
+                          backgroundColor: AppColors.lightBlue,
+                          child: Icon(Icons.camera_alt, color: AppColors.blue, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                profile['name'] ?? 'Tanpa nama',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Tilt: $tiltStr°',
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor(status).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              status,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: statusColor(status),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    if (data['recommendation'] != null &&
+                        data['recommendation'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Rekomendasi: ${data['recommendation']}',
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               );
             }),
@@ -7019,34 +6920,43 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         child: Row(
           children: [
             Container(
-              width: 96,
-              padding: const EdgeInsets.all(10),
+              width: 72,
+              padding: const EdgeInsets.symmetric(vertical: 16),
               color: Colors.white,
               child: Column(
                 children: [
-                  Image.asset('assets/images/Icon.png', width: 54),
+                  Image.asset('assets/images/Icon.png', width: 42),
                   const SizedBox(height: 20),
-                  ...menus.map(
-                    (m) => IconButton(
-                      tooltip: m[1] as String,
-                      onPressed: () => setState(() => active = m[0] as String),
-                      icon: Icon(
-                        m[2] as IconData,
-                        color: active == m[0] ? AppColors.blue : Colors.black45,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: menus.map(
+                          (m) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: IconButton(
+                              tooltip: m[1] as String,
+                              onPressed: () => setState(() => active = m[0] as String),
+                              icon: Icon(
+                                m[2] as IconData,
+                                color: active == m[0] ? AppColors.blue : Colors.black45,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ).toList(),
                       ),
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     onPressed: logout,
-                    icon: const Icon(Icons.logout, color: Colors.red),
+                    icon: const Icon(Icons.logout, color: Colors.red, size: 24),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
                     header(activeTitle),
