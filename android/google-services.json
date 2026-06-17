@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1077454726059",
+    "project_id": "scolix-ea8c1",
+    "storage_bucket": "scolix-ea8c1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1077454726059:android:8e8111ffda635c1c6068ee",
+        "android_client_info": {
+          "package_name": "com.IF24D.ScolixMobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1077454726059-ov0g9gik4qn7cpr9q14dvns8dkn215nf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.IF24D.ScolixMobile",
+            "certificate_hash": "6f47ecdbc73e06bf86d5a52b2ad67a97c9d69018"
+          }
+        },
+        {
+          "client_id": "1077454726059-vk1eagkrs4830fq1n0vhng1lhjt82n92.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQNUaamYcLM6XfuFy-UKqu7FpFFo50Pyg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1077454726059-vk1eagkrs4830fq1n0vhng1lhjt82n92.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1077454726059-b6djlj0ik3orqesarmhpvdbe0rg0diau.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.scolixMobileFix"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
